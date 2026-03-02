@@ -87,33 +87,53 @@ async def generate_callback(client, callback_query):
     user_id = callback_query.from_user.id
 
     await callback_query.message.edit_text(
-        "⏳ **Generating QR Code...**\n\nPlease wait..."
+        "⏳ **Generating QR Code...**"
     )
 
     result = await generate_pyrogram_session(bot, user_id)
 
-    # If 2FA required
+    # QR Expired
+    if result == "EXPIRED":
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🔄 Regenerate QR", callback_data="gen_pyro")]]
+        )
+
+        await bot.send_message(
+            user_id,
+            "❌ **QR Expired!**\n\n"
+            "Please generate a new QR and try again.",
+            reply_markup=keyboard
+        )
+        return
+
+    # 2FA Required
     if isinstance(result, tuple) and result[0] == "PASSWORD_REQUIRED":
         pending_password[user_id] = result[1]
         await bot.send_message(
             user_id,
             "🔐 **Two-Step Verification Enabled**\n\n"
-            "Please send your Telegram account password."
+            "Please send your Telegram password."
         )
         return
 
-    # Success
+    # SUCCESS
     if isinstance(result, tuple) and result[0] == "SUCCESS":
         me = result[1]
 
         await bot.send_message(
             user_id,
-            f"🎉 **Login Successful!**\n\n"
-            f"👤 Name: {me.first_name}\n"
-            f"🆔 ID: `{me.id}`\n\n"
-            "✅ Your session has been securely saved in your **Saved Messages**.\n\n"
-            "📂 Open Telegram → Saved Messages\n"
-            "🔐 Keep your session private."
+            f"""
+🎉 **Login Successful!**
+
+👤 **Name:** {me.first_name}
+🆔 **User ID:** `{me.id}`
+
+✅ Your session has been securely saved
+inside your **Saved Messages**.
+
+📂 Open Telegram → Saved Messages
+🔐 Keep your session private.
+"""
         )
 
 
