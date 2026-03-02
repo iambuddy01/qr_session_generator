@@ -21,7 +21,6 @@ async def generate_pyrogram_session(bot, user_id):
 
     await app.connect()
 
-    # Export Login Token
     token_data = await app.invoke(
         ExportLoginToken(api_id=API_ID, api_hash=API_HASH, except_ids=[])
     )
@@ -30,27 +29,21 @@ async def generate_pyrogram_session(bot, user_id):
     login_token_b64 = base64.urlsafe_b64encode(login_token).decode()
     qr_url = f"tg://login?token={login_token_b64}"
 
-    # Generate QR Image
     qr = qrcode.make(qr_url)
     bio = BytesIO()
     bio.name = "qr.png"
     qr.save(bio, "PNG")
     bio.seek(0)
 
-    qr_message = await bot.send_photo(
+    qr_msg = await bot.send_photo(
         user_id,
         bio,
-        caption=(
-            "🚀 **Scan QR To Login**\n\n"
-            "Telegram → Settings → Devices → Link Desktop Device\n\n"
-            "⏳ Expires in 30 seconds."
-        )
+        caption="📲 Scan QR → Settings → Devices → Link Desktop Device\n⏳ 30s Expiry"
     )
 
-    # Wait for Scan
     success = False
 
-    for _ in range(20):  # ~60 seconds
+    for _ in range(20):
         await asyncio.sleep(3)
         try:
             result = await app.invoke(
@@ -75,30 +68,27 @@ async def generate_pyrogram_session(bot, user_id):
         except Exception:
             continue
 
-    # If QR Expired
     if not success:
-        await qr_message.delete()
+        await qr_msg.delete()
         await app.disconnect()
         return "EXPIRED"
 
-    # 2FA Handling
+    # 🔐 HANDLE 2FA PROPERLY
     try:
         me = await app.get_me()
     except SessionPasswordNeeded:
-        return "PASSWORD_REQUIRED", app, qr_message
+        return "PASSWORD_REQUIRED", app, qr_msg
 
-    # Export Session
+    # Now session is FULLY AUTHORIZED
     session_string = await app.export_session_string()
 
-    # Save Session To Saved Messages
+    # Save session to Saved Messages
     await app.send_message(
         "me",
-        f"🔐 **Your Pyrogram String Session**\n\n"
-        f"`{session_string}`\n\n"
-        f"⚠️ Keep this safe."
+        f"🔐 **Your Pyrogram String Session**\n\n`{session_string}`"
     )
 
-    await qr_message.delete()
+    await qr_msg.delete()
     await app.disconnect()
 
     return "SUCCESS", me
